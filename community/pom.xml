@@ -85,6 +85,7 @@
     <module>neo4j-gql-status</module>
     <module>udc</module>
     <module>genai-plugin</module>
+    <module>rag-plugin</module>
   </modules>
 
   <profiles>
