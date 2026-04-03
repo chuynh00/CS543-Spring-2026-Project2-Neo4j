@@ -126,4 +126,100 @@ class RagRetrieveProcedureIT {
             assertThat(neighbors).containsExactly("gamma");
         }
     }
+
+    @Test
+    void shouldRerankSeedsToAvoidOverlappingNeighborhoods() {
+        try (Neo4j neo4j = Neo4jBuilders.newInProcessBuilder()
+                .withProcedure(RagRetrieveProcedure.class)
+                .withFixture(
+                        """
+                    CREATE (a:Post {content: 'alpha', embedding: [1.0, 0.0, 0.0]})
+                    CREATE (b:Post {content: 'beta',  embedding: [0.99, 0.01, 0.0]})
+                    CREATE (c:Post {content: 'gamma', embedding: [0.98, 0.02, 0.0]})
+                    CREATE (x1:Context {content: 'x1'})
+                    CREATE (x2:Context {content: 'x2'})
+                    CREATE (y1:Context {content: 'y1'})
+                    CREATE (y2:Context {content: 'y2'})
+                    CREATE (a)-[:LINK]->(x1)
+                    CREATE (a)-[:LINK]->(x2)
+                    CREATE (b)-[:LINK]->(x1)
+                    CREATE (b)-[:LINK]->(x2)
+                    CREATE (c)-[:LINK]->(y1)
+                    CREATE (c)-[:LINK]->(y2)
+                    """)
+                .withFixture(
+                        "CREATE VECTOR INDEX idx FOR (n:Post) ON (n.embedding) OPTIONS {indexConfig: {`vector.dimensions`: 3, `vector.similarity_function`: 'cosine'}}")
+                .build()) {
+
+            try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+                tx.execute("CALL db.awaitIndexes(120)");
+                tx.commit();
+            }
+
+            try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+                List<String> seeds = tx.execute(
+                                "CALL rag.retrieve('idx', [1.0, 0.0, 0.0], 2, 0, "
+                                        + "{oversampleFactor: 3, overlapPenaltyWeight: 1.0, maxCandidateK: 10}) "
+                                        + "YIELD node, hopDepth, score "
+                                        + "RETURN node.content AS content, hopDepth "
+                                        + "ORDER BY hopDepth, content")
+                        .stream()
+                        .map(row -> (String) row.get("content"))
+                        .toList();
+
+                assertThat(seeds).containsExactly("alpha", "gamma");
+                tx.commit();
+            }
+        }
+    }
+
+    @Test
+    void shouldMatchOriginalBehaviorWhenRerankingIsDisabled() {
+        try (Neo4j neo4j = Neo4jBuilders.newInProcessBuilder()
+                .withProcedure(RagRetrieveProcedure.class)
+                .withFixture(
+                        """
+                    CREATE (a:Post {content: 'alpha', embedding: [1.0, 0.0, 0.0]})
+                    CREATE (b:Post {content: 'beta',  embedding: [0.9, 0.1, 0.0]})
+                    CREATE (c:Post {content: 'gamma', embedding: [0.0, 0.0, 1.0]})
+                    CREATE (a)-[:LINK]->(b)
+                    CREATE (b)-[:LINK]->(c)
+                    """)
+                .withFixture(
+                        "CREATE VECTOR INDEX idx FOR (n:Post) ON (n.embedding) OPTIONS {indexConfig: {`vector.dimensions`: 3, `vector.similarity_function`: 'cosine'}}")
+                .build()) {
+
+            try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+                tx.execute("CALL db.awaitIndexes(120)");
+                tx.commit();
+            }
+
+            List<Map<String, Object>> originalRows;
+            try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+                originalRows = tx
+                        .execute("CALL rag.retrieve('idx', [1.0, 0.0, 0.0], 2, 1) "
+                                + "YIELD node, hopDepth, score "
+                                + "RETURN node.content AS content, hopDepth, score "
+                                + "ORDER BY hopDepth, content")
+                        .stream()
+                        .toList();
+                tx.commit();
+            }
+
+            List<Map<String, Object>> configRows;
+            try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+                configRows = tx
+                        .execute("CALL rag.retrieve('idx', [1.0, 0.0, 0.0], 2, 1, "
+                                + "{oversampleFactor: 1, overlapPenaltyWeight: 0.0, maxCandidateK: 2}) "
+                                + "YIELD node, hopDepth, score "
+                                + "RETURN node.content AS content, hopDepth, score "
+                                + "ORDER BY hopDepth, content")
+                        .stream()
+                        .toList();
+                tx.commit();
+            }
+
+            assertThat(configRows).isEqualTo(originalRows);
+        }
+    }
 }
