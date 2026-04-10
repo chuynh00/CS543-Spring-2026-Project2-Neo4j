@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+
+# Local machine config and secrets.
+config/neo4j_local.json
+
+# Generated benchmark outputs.
+results/raw/*
+results/summaries/*
+!results/raw/.gitkeep
+!results/summaries/.gitkeep
+
+# Large or generated data artifacts.
+data/raw/
+data/processed/
+data/query_sets/*.jsonl
+!data/query_sets/example.jsonl
