@@ -26,6 +26,15 @@ def summarize_latencies(latencies_ms: list[float]) -> dict[str, float]:
     """Create a compact latency summary for one benchmark method."""
 
     ordered = sorted(latencies_ms)
+    if not ordered:
+        return {
+            "count": 0.0,
+            "min_ms": 0.0,
+            "median_ms": 0.0,
+            "p95_ms": 0.0,
+            "p99_ms": 0.0,
+            "max_ms": 0.0,
+        }
     return {
         "count": float(len(ordered)),
         "min_ms": ordered[0],

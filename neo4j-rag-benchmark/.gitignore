@@ -9,11 +9,14 @@ config/neo4j_local.json
 # Generated benchmark outputs.
 results/raw/*
 results/summaries/*
+results/logs/*
 !results/raw/.gitkeep
 !results/summaries/.gitkeep
+!results/logs/.gitkeep
 
 # Large or generated data artifacts.
 data/raw/
 data/processed/
-data/query_sets/*.jsonl
-!data/query_sets/example.jsonl
+data/query_sets/*
+!data/query_sets/README.md
+!data/query_sets/example_manifest.json

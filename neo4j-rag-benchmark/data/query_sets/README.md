@@ -1,10 +1,12 @@
-Place benchmark query sets here as JSONL files.
+Place benchmark case manifests here as JSON files.
 
-Each line must contain:
+Each manifest must be a JSON array. Each entry must contain:
 - query_id: string
-- embedding: list of floats
-- top_k: integer
-- depth: integer
+- native_query: relative path under queries/
+- baseline_vector_query: relative path under queries/
+- baseline_traversal_query: relative path under queries/
+- params: object passed to the query files
 
 Optional:
-- config: object forwarded to rag.retrieve(..., config)
+- enabled: boolean, defaults to true
+- native_config: object merged into the default rag.retrieve config for this case

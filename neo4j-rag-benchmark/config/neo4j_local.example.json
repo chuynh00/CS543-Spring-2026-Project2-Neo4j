@@ -1,8 +1,7 @@
 {
   "uri": "bolt://localhost:7687",
   "user": "neo4j",
-  "password": "csci543-neo4j",
+  "password": "please-change-me",
   "database": "neo4j",
-  "index_name": "idx",
-  "query_set": "data/query_sets/example.jsonl"
+  "query_manifest": "data/query_sets/example_manifest.json"
 }

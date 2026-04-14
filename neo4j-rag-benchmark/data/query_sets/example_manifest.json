@@ -1,0 +1,21 @@
+[
+  {
+    "query_id": "example-1",
+    "native_query": "cases/example-1/native.cql",
+    "baseline_vector_query": "cases/example-1/baseline_vector.cql",
+    "baseline_traversal_query": "cases/example-1/baseline_traversal.cql",
+    "params": {
+      "index_name": "doc_embedding_index",
+      "embedding": [1.0, 0.0, 0.0],
+      "top_k": 2,
+      "depth": 1
+    },
+    "native_config": {
+      "oversampleFactor": 5,
+      "overlapPenaltyWeight": 0.3,
+      "maxCandidateK": 20,
+      "maxNeighborhoodSize": 50,
+      "overlapHop": 1
+    }
+  }
+]
