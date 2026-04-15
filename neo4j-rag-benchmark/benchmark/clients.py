@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from neo4j import Driver, GraphDatabase
@@ -19,17 +18,16 @@ class RetrievalRow:
 class BenchmarkClient:
     """Neo4j driver wrapper for the native procedure and the two-call baseline."""
 
-    def __init__(self, driver: Driver, query_dir: Path, database: str):
+    def __init__(self, driver: Driver, database: str):
         self._driver = driver
         self._database = database
-        self._native_query = (query_dir / "rag_retrieve.cql").read_text(encoding="utf-8")
-        self._vector_query = (query_dir / "baseline_vector_search.cql").read_text(encoding="utf-8")
-        self._traversal_template = (query_dir / "baseline_traversal.cql").read_text(encoding="utf-8")
 
     @classmethod
-    def connect(cls, uri: str, user: str, password: str, query_dir: Path, database: str) -> "BenchmarkClient":
-        driver = GraphDatabase.driver(uri, auth=(user, password))
-        return cls(driver, query_dir=query_dir, database=database)
+    def connect(cls, uri: str, user: str, password: str, database: str) -> "BenchmarkClient":
+        if bool(user) != bool(password):
+            raise ValueError("Neo4j user and password must either both be set or both be omitted.")
+        driver = GraphDatabase.driver(uri, auth=(user, password)) if user else GraphDatabase.driver(uri)
+        return cls(driver, database=database)
 
     def close(self) -> None:
         self._driver.close()
@@ -37,26 +35,20 @@ class BenchmarkClient:
     def run_native_rag(
         self,
         *,
-        index_name: str,
-        embedding: list[float],
-        top_k: int,
-        depth: int,
+        query_text: str,
+        params: dict[str, Any],
         config: dict[str, Any],
     ) -> list[RetrievalRow]:
+        execution_params = dict(params)
+        execution_params["config"] = config
+
         with self._driver.session(database=self._database) as session:
-            records = session.run(
-                self._native_query,
-                index_name=index_name,
-                embedding=embedding,
-                top_k=top_k,
-                depth=depth,
-                config=config,
-            )
+            records = session.run(query_text, **execution_params)
             return [
                 RetrievalRow(
                     node_id=int(record["nodeId"]),
                     hop_depth=int(record["hopDepth"]),
-                    score=float(record["score"]),
+                    score=float(record["score"]) if record["score"] is not None else None,
                 )
                 for record in records
             ]
@@ -64,33 +56,27 @@ class BenchmarkClient:
     def run_two_call_baseline(
         self,
         *,
-        index_name: str,
-        embedding: list[float],
-        top_k: int,
-        depth: int,
+        vector_query_text: str,
+        traversal_query_text: str,
+        params: dict[str, Any],
     ) -> tuple[list[RetrievalRow], list[int]]:
         with self._driver.session(database=self._database) as session:
-            seed_records = list(
-                session.run(
-                    self._vector_query,
-                    index_name=index_name,
-                    embedding=embedding,
-                    top_k=top_k,
-                )
-            )
+            seed_records = list(session.run(vector_query_text, **params))
             seed_ids = [int(record["nodeId"]) for record in seed_records]
             seed_scores = {int(record["nodeId"]): float(record["score"]) for record in seed_records}
 
             if not seed_ids:
                 return [], []
 
-            traversal_query = self._traversal_template.replace("__DEPTH__", str(depth))
+            rendered_traversal_query = traversal_query_text.replace("__DEPTH__", str(params["depth"]))
+            traversal_params = dict(params)
+            traversal_params["seed_ids"] = seed_ids
             rows = [
                 RetrievalRow(
                     node_id=int(record["nodeId"]),
                     hop_depth=int(record["hopDepth"]),
                     score=seed_scores.get(int(record["nodeId"])),
                 )
-                for record in session.run(traversal_query, seed_ids=seed_ids)
+                for record in session.run(rendered_traversal_query, **traversal_params)
             ]
             return rows, seed_ids

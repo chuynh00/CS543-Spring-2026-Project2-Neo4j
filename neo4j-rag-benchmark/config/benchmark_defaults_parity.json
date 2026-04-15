@@ -1,0 +1,12 @@
+{
+  "warmup_runs": 2,
+  "measured_runs": 5,
+  "result_limit": null,
+  "native_config": {
+    "oversampleFactor": 1,
+    "overlapPenaltyWeight": 0.0,
+    "maxCandidateK": 100,
+    "maxNeighborhoodSize": 0,
+    "overlapHop": 1
+  }
+}
