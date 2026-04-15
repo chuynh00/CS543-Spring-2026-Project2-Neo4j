@@ -1,0 +1,8 @@
+{
+  "runtime_root": "/absolute/path/to/neo4j-rag-runtime",
+  "runtime_home": "/absolute/path/to/neo4j-rag-runtime/neo4j-community-5.26.0-native-rag",
+  "java_home": "/opt/homebrew/Cellar/openjdk@17/17.0.18/libexec/openjdk.jdk/Contents/Home",
+  "uri": "bolt://127.0.0.1:7687",
+  "database": "neo4j",
+  "results_root": "results"
+}

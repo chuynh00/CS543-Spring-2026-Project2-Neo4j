@@ -4,6 +4,7 @@ __pycache__/
 *.log
 
 # Local machine config and secrets.
+config/bench_local.json
 config/neo4j_local.json
 
 # Generated benchmark outputs.
