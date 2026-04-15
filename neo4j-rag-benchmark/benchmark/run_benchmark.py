@@ -216,7 +216,6 @@ class BenchmarkRunner:
         return latency_ms, rows, seed_ids
 
 
-
 def merged_native_config(defaults: dict[str, Any], query_case: QueryCase) -> dict[str, Any]:
     """Merge global native config defaults with case-specific overrides."""
 
@@ -225,14 +224,12 @@ def merged_native_config(defaults: dict[str, Any], query_case: QueryCase) -> dic
     return native_config
 
 
-
 def query_file_for_method(query_case: QueryCase, method: str) -> str:
     """Return the most useful query-file label for logging and CSV output."""
 
     if method == "native":
         return query_case.native_query_path
     return f"{query_case.baseline_vector_query_path} + {query_case.baseline_traversal_query_path}"
-
 
 
 def format_progress_line(
@@ -255,7 +252,6 @@ def format_progress_line(
     )
 
 
-
 def timed_call(func, /, **kwargs):
     """Measure one function call in milliseconds."""
 
@@ -265,12 +261,10 @@ def timed_call(func, /, **kwargs):
     return ns_to_ms(end - start), result
 
 
-
 def normalize_rows(rows: list[RetrievalRow]) -> list[tuple[int, int]]:
     """Normalize retrieval rows for loose equivalence checks across methods."""
 
     return sorted((row.node_id, row.hop_depth) for row in rows)
-
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -279,7 +273,14 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def driver_kwargs_for_config(neo4j_config: dict[str, Any]) -> dict[str, Any]:
+    """Return the correct Neo4j driver kwargs for optional auth configs."""
 
+    user = neo4j_config.get("user", "")
+    password = neo4j_config.get("password", "")
+    if bool(user) != bool(password):
+        raise ValueError("Neo4j user and password must either both be set or both be omitted.")
+    return {"auth": (user, password)} if user else {}
 def restart_server(server_home: Path, neo4j_config: dict[str, Any], logger: DualLogger) -> None:
     """Restart Neo4j between comparison phases and wait for Bolt readiness."""
 
@@ -300,22 +301,17 @@ def restart_server(server_home: Path, neo4j_config: dict[str, Any], logger: Dual
     if result.stderr.strip():
         logger.log(result.stderr.strip())
 
-    wait_for_bolt(
-        uri=neo4j_config["uri"],
-        user=neo4j_config["user"],
-        password=neo4j_config["password"],
-        logger=logger,
-    )
+    wait_for_bolt(neo4j_config=neo4j_config, logger=logger)
 
 
-
-def wait_for_bolt(*, uri: str, user: str, password: str, logger: DualLogger, timeout_seconds: int = 60) -> None:
-    """Wait until the Bolt endpoint accepts authenticated connections again."""
+def wait_for_bolt(*, neo4j_config: dict[str, Any], logger: DualLogger, timeout_seconds: int = 60) -> None:
+    """Wait until the Bolt endpoint accepts connections again."""
 
     deadline = time.time() + timeout_seconds
     last_error: Exception | None = None
+    driver_kwargs = driver_kwargs_for_config(neo4j_config)
     while time.time() < deadline:
-        driver = GraphDatabase.driver(uri, auth=(user, password))
+        driver = GraphDatabase.driver(neo4j_config["uri"], **driver_kwargs)
         try:
             driver.verify_connectivity()
             logger.log("Neo4j is accepting Bolt connections again.")
@@ -327,8 +323,6 @@ def wait_for_bolt(*, uri: str, user: str, password: str, logger: DualLogger, tim
             driver.close()
 
     raise TimeoutError(f"Neo4j Bolt endpoint did not become ready within {timeout_seconds}s: {last_error}")
-
-
 
 def build_comparison_summary(
     *,
@@ -369,8 +363,6 @@ def build_comparison_summary(
         },
         "queries": comparisons,
     }
-
-
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Benchmark native rag.retrieve against a two-call Cypher baseline.")
@@ -420,7 +412,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-
 def resolve_manifest_path(args: argparse.Namespace, neo4j_config: dict[str, Any]) -> Path:
     """Resolve the benchmark case manifest from CLI args or config."""
 
@@ -431,7 +422,6 @@ def resolve_manifest_path(args: argparse.Namespace, neo4j_config: dict[str, Any]
     if not manifest_path.is_absolute():
         manifest_path = ROOT / manifest_path
     return manifest_path
-
 
 
 def run_method_phase(
@@ -465,8 +455,8 @@ def run_method_phase(
 
     client = BenchmarkClient.connect(
         uri=neo4j_config["uri"],
-        user=neo4j_config["user"],
-        password=neo4j_config["password"],
+        user=neo4j_config.get("user", ""),
+        password=neo4j_config.get("password", ""),
         database=neo4j_config["database"],
     )
 
@@ -486,7 +476,6 @@ def run_method_phase(
     finally:
         client.close()
         logger.close()
-
 
 
 def main() -> None:

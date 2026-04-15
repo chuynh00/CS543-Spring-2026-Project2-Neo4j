@@ -19,17 +19,11 @@ class QueryCase:
     baseline_traversal_query: str
     params: dict[str, Any]
     native_config: dict[str, Any]
-
-
-
 def _load_query_text(query_root: Path, relative_path: str) -> tuple[str, str]:
     query_path = query_root / relative_path
     if not query_path.exists():
         raise FileNotFoundError(f"Query file not found: {query_path}")
     return relative_path, query_path.read_text(encoding="utf-8")
-
-
-
 def load_query_cases(path: str | Path, query_root: str | Path) -> list[QueryCase]:
     """Load a JSON manifest and its per-case query files into typed benchmark cases."""
 

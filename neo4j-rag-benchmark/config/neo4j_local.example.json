@@ -1,7 +1,7 @@
 {
   "uri": "bolt://localhost:7687",
-  "user": "neo4j",
-  "password": "please-change-me",
+  "user": "",
+  "password": "",
   "database": "neo4j",
   "query_manifest": "data/query_sets/example_manifest.json"
 }

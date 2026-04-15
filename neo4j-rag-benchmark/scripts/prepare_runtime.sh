@@ -6,7 +6,7 @@ BENCHMARK_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SOURCE_REPO="$(cd "${BENCHMARK_ROOT}/.." && pwd)"
 PROJECT_ROOT="$(cd "${SOURCE_REPO}/.." && pwd)"
 RUNTIME_ROOT="${PROJECT_ROOT}/neo4j-rag-runtime"
-OVERRIDE_FILE="${RUNTIME_ROOT}/conf-overrides/neo4j-rag.conf"
+OVERRIDE_FILE="${BENCHMARK_ROOT}/config/neo4j-rag.conf"
 
 SERVER_HOME="${1:-}"
 if [[ -z "${SERVER_HOME}" ]]; then
@@ -19,13 +19,18 @@ if [[ -z "${SERVER_HOME}" || ! -d "${SERVER_HOME}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${OVERRIDE_FILE}" ]]; then
+  echo "Runtime override file not found: ${OVERRIDE_FILE}"
+  exit 1
+fi
+
 PLUGIN_TARGET_DIR="${SOURCE_REPO}/community/rag-plugin/target"
-PLUGIN_JAR="$(find "${PLUGIN_TARGET_DIR}" -maxdepth 1 -type f -name 'neo4j-rag-plugin-*.jar' ! -name '*-javadoc.jar' ! -name '*-sources.jar' | head -n 1 || true)"
+PLUGIN_JAR="$(find "${PLUGIN_TARGET_DIR}" -maxdepth 1 -type f -name 'neo4j-rag-plugin-*.jar' ! -name '*-javadoc.jar' ! -name '*-sources.jar' ! -name '*-tests.jar' | head -n 1 || true)"
 
 if [[ -z "${PLUGIN_JAR}" ]]; then
   echo "Plugin JAR not found. Building neo4j-rag-plugin first..."
   (cd "${SOURCE_REPO}" && mvn -pl community/rag-plugin -Dmaven.test.skip=true package)
-  PLUGIN_JAR="$(find "${PLUGIN_TARGET_DIR}" -maxdepth 1 -type f -name 'neo4j-rag-plugin-*.jar' ! -name '*-javadoc.jar' ! -name '*-sources.jar' | head -n 1 || true)"
+  PLUGIN_JAR="$(find "${PLUGIN_TARGET_DIR}" -maxdepth 1 -type f -name 'neo4j-rag-plugin-*.jar' ! -name '*-javadoc.jar' ! -name '*-sources.jar' ! -name '*-tests.jar' | head -n 1 || true)"
 fi
 
 if [[ -z "${PLUGIN_JAR}" ]]; then

@@ -24,7 +24,9 @@ class BenchmarkClient:
 
     @classmethod
     def connect(cls, uri: str, user: str, password: str, database: str) -> "BenchmarkClient":
-        driver = GraphDatabase.driver(uri, auth=(user, password))
+        if bool(user) != bool(password):
+            raise ValueError("Neo4j user and password must either both be set or both be omitted.")
+        driver = GraphDatabase.driver(uri, auth=(user, password)) if user else GraphDatabase.driver(uri)
         return cls(driver, database=database)
 
     def close(self) -> None:
