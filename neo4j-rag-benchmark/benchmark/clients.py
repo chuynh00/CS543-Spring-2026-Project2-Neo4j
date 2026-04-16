@@ -80,3 +80,39 @@ class BenchmarkClient:
                 for record in session.run(rendered_traversal_query, **traversal_params)
             ]
             return rows, seed_ids
+
+    def fetch_one_hop_neighborhoods(self, node_ids: list[int]) -> dict[int, set[int]]:
+        """Fetch undirected 1-hop neighborhoods for internal Neo4j node ids."""
+
+        if not node_ids:
+            return {}
+
+        query = """
+        MATCH (node)
+        WHERE id(node) IN $node_ids
+        OPTIONAL MATCH (node)--(neighbor)
+        RETURN id(node) AS nodeId, collect(DISTINCT id(neighbor)) AS neighborIds
+        """
+        with self._driver.session(database=self._database) as session:
+            records = session.run(query, node_ids=node_ids)
+            return {
+                int(record["nodeId"]): {
+                    int(neighbor_id) for neighbor_id in record["neighborIds"] if neighbor_id is not None
+                }
+                for record in records
+            }
+
+    def fetch_node_labels(self, node_ids: list[int]) -> dict[int, int]:
+        """Fetch the imported ogbn-arxiv integer label for result nodes."""
+
+        if not node_ids:
+            return {}
+
+        query = """
+        MATCH (node)
+        WHERE id(node) IN $node_ids AND node.label IS NOT NULL
+        RETURN id(node) AS nodeId, node.label AS label
+        """
+        with self._driver.session(database=self._database) as session:
+            records = session.run(query, node_ids=node_ids)
+            return {int(record["nodeId"]): int(record["label"]) for record in records}
