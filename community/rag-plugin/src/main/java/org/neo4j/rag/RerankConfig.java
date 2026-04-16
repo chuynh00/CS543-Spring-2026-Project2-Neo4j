@@ -28,12 +28,19 @@ import java.util.Map;
  * still allowing experiments with oversampling and overlap sensitivity.
  */
 record RerankConfig(
-        int oversampleFactor, double overlapPenaltyWeight, int maxCandidateK, int maxNeighborhoodSize, int overlapHop) {
+        int oversampleFactor,
+        double overlapPenaltyWeight,
+        int maxCandidateK,
+        int maxNeighborhoodSize,
+        int overlapHop,
+        int parallelism) {
     private static final int DEFAULT_OVERSAMPLE_FACTOR = 5;
     private static final double DEFAULT_OVERLAP_PENALTY_WEIGHT = 0.3;
     private static final int DEFAULT_MAX_CANDIDATE_K = 100;
     private static final int DEFAULT_MAX_NEIGHBORHOOD_SIZE = 200;
     private static final int DEFAULT_OVERLAP_HOP = 1;
+    /** 0 = use {@link Runtime#availableProcessors()}; 1 = sequential BFS; &gt; 1 caps parallel workers. */
+    private static final int DEFAULT_PARALLELISM = 0;
 
     /**
      * Build a config object from the procedure's config map, filling in any
@@ -49,6 +56,7 @@ record RerankConfig(
         int maxCandidateK = intValue(safeConfig, "maxCandidateK", DEFAULT_MAX_CANDIDATE_K);
         int maxNeighborhoodSize = intValue(safeConfig, "maxNeighborhoodSize", DEFAULT_MAX_NEIGHBORHOOD_SIZE);
         int overlapHop = intValue(safeConfig, "overlapHop", DEFAULT_OVERLAP_HOP);
+        int parallelism = intValue(safeConfig, "parallelism", DEFAULT_PARALLELISM);
 
         // Fail and throw an exception on invalid inputs so the procedure does not run with an invalid configuration.
         if (oversampleFactor < 1) {
@@ -66,9 +74,17 @@ record RerankConfig(
         if (overlapHop != 1) {
             throw new IllegalArgumentException("Only 'overlapHop' = 1 is supported in this version");
         }
+        if (parallelism < 0) {
+            throw new IllegalArgumentException("'parallelism' must be 0 (auto), 1 (sequential), or a positive worker cap");
+        }
 
         return new RerankConfig(
-                oversampleFactor, overlapPenaltyWeight, maxCandidateK, maxNeighborhoodSize, overlapHop);
+                oversampleFactor,
+                overlapPenaltyWeight,
+                maxCandidateK,
+                maxNeighborhoodSize,
+                overlapHop,
+                parallelism);
     }
 
     /**

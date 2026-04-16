@@ -106,14 +106,9 @@ public class RagRetrieveProcedure {
             seedScores.put(seed.nodeId(), seed.annScore());
         }
 
-        // 6. Traverse from the reranked seeds using the existing BFS implementation.
-        Map<Long, Integer> visited = BfsTraversal.run(
-                seedIds,
-                Math.toIntExact(depth),
-                ktx.dataRead(),
-                ktx.cursors(),
-                ktx.cursorContext(),
-                ktx.memoryTracker());
+        // 6. Traverse from the reranked seeds (parallel frontier expansion unless parallelism == 1).
+        Map<Long, Integer> visited =
+                ParallelBfsTraversal.run(seedIds, Math.toIntExact(depth), ktx, rerankConfig.parallelism());
 
         // 7. Convert the visited node ids back into procedure rows with hop depth and seed score.
         List<SubgraphRow> results = new ArrayList<>();
