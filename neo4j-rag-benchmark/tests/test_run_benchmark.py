@@ -17,6 +17,12 @@ class FakeClient:
     def run_two_call_baseline(self, *, vector_query_text, traversal_query_text, params):
         return [RetrievalRow(node_id=1, hop_depth=0, score=1.0)], [1]
 
+    def fetch_one_hop_neighborhoods(self, node_ids):
+        return {node_id: {node_id + 10} for node_id in node_ids}
+
+    def fetch_node_labels(self, node_ids):
+        return {node_id: node_id % 2 for node_id in node_ids}
+
     def close(self):
         return None
 
@@ -71,6 +77,7 @@ class BenchmarkRunnerTest(unittest.TestCase):
                 summary=dummy_summary,
                 normalized_results={"q1": [(1, 0)]},
                 seed_ids={"q1": []},
+                reference_rows={"q1": [RetrievalRow(node_id=1, hop_depth=0, score=1.0)]},
             )
             baseline = MethodArtifacts(
                 method="baseline",
@@ -80,6 +87,7 @@ class BenchmarkRunnerTest(unittest.TestCase):
                 summary=dummy_summary,
                 normalized_results={"q1": [(1, 0)]},
                 seed_ids={"q1": [1]},
+                reference_rows={"q1": [RetrievalRow(node_id=1, hop_depth=0, score=1.0)]},
             )
             summary = build_comparison_summary(
                 native_artifacts=native,

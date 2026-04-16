@@ -14,6 +14,7 @@ from neo4j import GraphDatabase
 
 from benchmark.clients import BenchmarkClient, RetrievalRow
 from benchmark.metrics import ns_to_ms, summarize_latencies
+from benchmark.quality import write_comparison_quality_artifacts
 from benchmark.workloads import QueryCase, load_query_cases
 
 
@@ -35,6 +36,7 @@ class MethodArtifacts:
     summary: dict[str, Any]
     normalized_results: dict[str, list[tuple[int, int]]]
     seed_ids: dict[str, list[int]]
+    reference_rows: dict[str, list[RetrievalRow]]
 
 
 class DualLogger:
@@ -86,6 +88,7 @@ class BenchmarkRunner:
         latencies_ms: list[float] = []
         normalized_results: dict[str, list[tuple[int, int]]] = {}
         seed_ids_by_query: dict[str, list[int]] = {}
+        reference_rows_by_query: dict[str, list[RetrievalRow]] = {}
         query_summaries: dict[str, Any] = {}
 
         with raw_path.open("w", encoding="utf-8", newline="") as handle:
@@ -110,6 +113,7 @@ class BenchmarkRunner:
                 reference_rows, reference_seed_ids = self._reference_outputs(method, query_case)
                 normalized_reference_rows = normalize_rows(reference_rows)
                 normalized_results[query_case.query_id] = normalized_reference_rows
+                reference_rows_by_query[query_case.query_id] = reference_rows
                 seed_ids_by_query[query_case.query_id] = reference_seed_ids
                 query_summaries[query_case.query_id] = {
                     "query_file": query_file_for_method(query_case, method),
@@ -178,6 +182,7 @@ class BenchmarkRunner:
             summary=summary,
             normalized_results=normalized_results,
             seed_ids=seed_ids_by_query,
+            reference_rows=reference_rows_by_query,
         )
 
     def _reference_outputs(self, method: str, query_case: QueryCase) -> tuple[list[RetrievalRow], list[int]]:
@@ -187,7 +192,7 @@ class BenchmarkRunner:
                 params=query_case.params,
                 config=merged_native_config(self.defaults, query_case),
             )
-            return rows, []
+            return rows, [row.node_id for row in rows if row.hop_depth == 0]
 
         rows, seed_ids = self.client.run_two_call_baseline(
             vector_query_text=query_case.baseline_vector_query,
@@ -524,6 +529,26 @@ def main() -> None:
         comparison_path = results_root / "summaries" / f"comparison-{session_id}.json"
         comparison_path.write_text(json.dumps(comparison_summary, indent=2), encoding="utf-8")
         print(f"Wrote comparison summary to {comparison_path}")
+
+        quality_client = BenchmarkClient.connect(
+            uri=neo4j_config["uri"],
+            user=neo4j_config.get("user", ""),
+            password=neo4j_config.get("password", ""),
+            database=neo4j_config["database"],
+        )
+        try:
+            quality_csv_path, quality_summary_path, _ = write_comparison_quality_artifacts(
+                query_cases=query_cases,
+                native_rows_by_query=artifacts_by_method["native"].reference_rows,
+                baseline_rows_by_query=artifacts_by_method["baseline"].reference_rows,
+                client=quality_client,
+                results_root=results_root,
+                session_id=session_id,
+            )
+        finally:
+            quality_client.close()
+        print(f"Wrote comparison quality CSV to {quality_csv_path}")
+        print(f"Wrote comparison quality summary to {quality_summary_path}")
         return
 
     artifacts = run_method_phase(
