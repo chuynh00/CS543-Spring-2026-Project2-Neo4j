@@ -65,7 +65,8 @@ public class RagRetrieveProcedure {
             @Name("indexName") String indexName,
             @Name("embedding") List<Double> embedding,
             @Name("topK") long topK,
-            @Name("depth") long depth)
+            @Name("depth") long depth,
+            @Name(value = "parallelism", defaultValue = "0") long parallelism)
             throws KernelException {
 
         // 1. Resolve vector index by name
@@ -101,14 +102,9 @@ public class RagRetrieveProcedure {
         }
         cursor.close();
 
-        // 4. BFS traversal from seed nodes (bypasses Cypher entirely)
-        Map<Long, Integer> visited = BfsTraversal.run(
-                seedIds,
-                Math.toIntExact(depth),
-                ktx.dataRead(),
-                ktx.cursors(),
-                ktx.cursorContext(),
-                ktx.memoryTracker());
+        // 4. BFS traversal from seed nodes (bypasses Cypher entirely); parallel frontier expansion when parallelism != 1
+        Map<Long, Integer> visited = ParallelBfsTraversal.run(
+                seedIds, Math.toIntExact(depth), ktx, Math.toIntExact(parallelism));
 
         // 5. Build result stream
         List<SubgraphRow> results = new ArrayList<>();

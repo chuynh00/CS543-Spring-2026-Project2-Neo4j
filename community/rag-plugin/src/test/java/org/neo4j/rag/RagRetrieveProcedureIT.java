@@ -21,8 +21,11 @@ package org.neo4j.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.neo4j.harness.Neo4j;
 import org.neo4j.harness.Neo4jBuilders;
@@ -125,5 +128,68 @@ class RagRetrieveProcedureIT {
                     .toList();
             assertThat(neighbors).containsExactly("gamma");
         }
+    }
+
+    @Test
+    void parallelTraversalShouldMatchSequentialOnWideFrontier() {
+        StringBuilder create = new StringBuilder();
+        create.append("CREATE (hub:Post {content: 'hub', embedding: [1.0, 0.0, 0.0]})\n");
+        for (int i = 0; i < 32; i++) {
+            create.append(
+                    "CREATE (leaf")
+                            .append(i)
+                            .append(":Post {content: 'leaf")
+                            .append(i)
+                            .append("', embedding: [0.1, 0.9, 0.0]})\n");
+            create.append("CREATE (hub)-[:SPOKE]->(leaf").append(i).append(")\n");
+        }
+
+        try (Neo4j neo4j = Neo4jBuilders.newInProcessBuilder()
+                .withProcedure(RagRetrieveProcedure.class)
+                .withFixture(create.toString())
+                .withFixture(
+                        "CREATE VECTOR INDEX postEmbeddings FOR (n:Post) ON (n.embedding) OPTIONS {indexConfig: {`vector.dimensions`: 3, `vector.similarity_function`: 'cosine'}}")
+                .build()) {
+
+            try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+                tx.execute("CALL db.awaitIndexes(120)");
+                tx.commit();
+            }
+
+            List<Map<String, Object>> sequential = runRetrieve(neo4j, 1);
+            List<Map<String, Object>> parallel = runRetrieve(neo4j, 8);
+
+            assertThat(normalizeRows(sequential)).isEqualTo(normalizeRows(parallel));
+        }
+    }
+
+    private static List<Map<String, Object>> runRetrieve(Neo4j neo4j, int parallelism) {
+        try (var tx = neo4j.defaultDatabaseService().beginTx()) {
+            var result = tx.execute(
+                    "CALL rag.retrieve('postEmbeddings', [1.0, 0.0, 0.0], 5, 1, $p) "
+                            + "YIELD node, hopDepth, score "
+                            + "RETURN node.content AS content, hopDepth, score",
+                    Map.of("p", (long) parallelism));
+            List<Map<String, Object>> rows = result.stream().toList();
+            tx.commit();
+            return rows;
+        }
+    }
+
+    /**
+     * Stable comparison: hop depth, then content. (Parallel BFS may return rows in different order.)
+     */
+    private static List<Map<String, Object>> normalizeRows(List<Map<String, Object>> rows) {
+        return rows.stream()
+                .sorted(Comparator.comparing((Map<String, Object> r) -> (Long) r.get("hopDepth"))
+                        .thenComparing(r -> (String) r.get("content")))
+                .map(r -> {
+                    Map<String, Object> copy = new HashMap<>();
+                    copy.put("content", r.get("content"));
+                    copy.put("hopDepth", r.get("hopDepth"));
+                    copy.put("score", r.get("score"));
+                    return copy;
+                })
+                .collect(Collectors.toList());
     }
 }
