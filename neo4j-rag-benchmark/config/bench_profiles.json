@@ -1,0 +1,46 @@
+{
+  "defaults": {
+    "dataset": "ogbn-arxiv",
+    "runtime_version": "5.26.0",
+    "runtime_root": "../../neo4j-rag-runtime",
+    "uri": "bolt://127.0.0.1:7687",
+    "database": "neo4j",
+    "results_root": "results",
+    "index_name": "paper_embedding_idx",
+    "processed_manifest": "data/processed/ogbn-arxiv/manifest.json",
+    "processed_dir": "data/processed/ogbn-arxiv"
+  },
+  "tiers": {
+    "smoke": {
+      "query_manifest": "data/query_sets/ogbn_arxiv/smoke_manifest.json"
+    },
+    "dev": {
+      "query_manifest": "data/query_sets/ogbn_arxiv/dev_manifest.json"
+    },
+    "full": {
+      "query_manifest": "data/query_sets/ogbn_arxiv/full_manifest.json"
+    }
+  },
+  "modes": {
+    "rerank": {
+      "comparison": true,
+      "defaults": "config/benchmark_defaults.json",
+      "order": "native-first"
+    },
+    "parity": {
+      "comparison": true,
+      "defaults": "config/benchmark_defaults_parity.json",
+      "order": "native-first"
+    },
+    "native-only": {
+      "comparison": false,
+      "method": "native",
+      "defaults": "config/benchmark_defaults.json"
+    },
+    "baseline-only": {
+      "comparison": false,
+      "method": "baseline",
+      "defaults": "config/benchmark_defaults.json"
+    }
+  }
+}
