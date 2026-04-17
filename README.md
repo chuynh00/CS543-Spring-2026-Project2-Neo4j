@@ -1,6 +1,6 @@
-# Native Neo4j RAG retrieval
+# NeoFuse - A Kernel-Level Express Lane for GraphRAG
 
-This workspace combines a **Neo4j Community fork** with a **`neo4j-rag-plugin`** that adds a single-call graph RAG procedure, plus a **Python benchmark harness** (`neo4j-rag-benchmark`) that compares that native path to a conventional two-query Cypher workflow on the **ogbn-arxiv** graph.
+This project combines a **Neo4j 5.26.0** with a **`neo4j-rag-plugin`** that adds a single-call graph RAG procedure, plus a **Python benchmark harness** (`neo4j-rag-benchmark`) that compares that native path to a conventional two-query Cypher workflow on the **ogbn-arxiv** graph.
 
 ---
 
@@ -8,8 +8,8 @@ This workspace combines a **Neo4j Community fork** with a **`neo4j-rag-plugin`**
 
 ### Stored procedure - `rag.retrieve` 
 
-The plugin exposes **`CALL rag.retrieve(indexName, embedding, topK, depth, config)`**. In one kernel execution it does the following:
-
+The plugin exposes **`CALL rag.retrieve(indexName, embedding, topK, depth, config)`**. 
+In one kernel execution it does the following:
 1. **Vector index search** - Uses the named vector index and nearest-neighbor seek to obtain an oversampled candidate pool (ANN scores in \([0,1]\)).
 2. **Graph-aware seed reranking** - For each candidate, collects a bounded **1-hop neighborhood**, then runs a **greedy reranker**: keep the best ANN hit first, then add seeds that stay high-scoring while penalizing **neighborhood overlap** with seeds already chosen (configurable `overlapPenaltyWeight`, oversampling, caps).
 3. **Bounded traversal** - From the final seed set, runs **BFS** to depth `depth` (parallel frontier expansion when `parallelism` is not 1).
@@ -41,8 +41,8 @@ Passed as the optional fifth argument; keys are merged with defaults in **`Reran
 | Path | Purpose |
 | --- | --- |
 | `CS543-Spring-2026-Project2-Neo4j/` | Neo4j source tree; **`community/rag-plugin`** is the added plugin |
-| `CS543-Spring-2026-Project2-Neo4j/neo4j-rag-benchmark/` | Dataset prep, CLI, and benchmark scripts (primary entry point: `./scripts/bench.sh`) |
-| `results/` (optional) | Default output root for CSVs, JSON summaries, and logs from benchmark runs (can be overridden) |
+| `CS543-Spring-2026-Project2-Neo4j/neo4j-rag-benchmark/` | Dataset, CLI and benchmark scripts (primary entry point: `./scripts/bench.sh`) |
+| `results/` | The comparisons in CSVs, JSON summaries and logs from benchmark runs |
 
 ---
 
@@ -150,10 +150,4 @@ The Python module **`benchmark/quality.py`** can compute **agreement-style metri
 - **Graph model in Neo4j**: Papers are imported with features and labels; a **vector index** (default name **`paper_embedding_idx`** in profiles) indexes the embedding property for ANN queries.
 - **Manifests** list, per case: `query_id`, paths to **native** and **baseline** query files under `queries/`, and **`params`** (including embedding, `topK`, `depth`, index name). Optional per-case **`native_config`** merges into defaults.
 
-Artifacts (typical locations under `neo4j-rag-benchmark/`):
-
-- `data/processed/ogbn-arxiv/papers.csv`, `cites.csv`, `manifest.json`
-- `data/query_sets/ogbn_arxiv/{smoke,dev,full}_manifest.json`
-
 ---
-
