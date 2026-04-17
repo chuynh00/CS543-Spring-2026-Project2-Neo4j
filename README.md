@@ -42,7 +42,11 @@ Passed as the optional fifth argument; keys are merged with defaults in **`Reran
 | --- | --- |
 | `CS543-Spring-2026-Project2-Neo4j/` | Neo4j source tree; **`community/rag-plugin`** is the added plugin |
 | `CS543-Spring-2026-Project2-Neo4j/neo4j-rag-benchmark/` | Dataset, CLI and benchmark scripts (primary entry point: `./scripts/bench.sh`) |
-| `results/` | The comparisons in CSVs, JSON summaries and logs from benchmark runs |
+| `../results/` | Benchmark outputs |
+
+### Results folder
+
+It stores **raw** per-query CSVs, **summaries** JSON, **logs**, and **plots** everything produced by a benchmark run so we can analyze latency and get insights on the performance.
 
 ---
 
