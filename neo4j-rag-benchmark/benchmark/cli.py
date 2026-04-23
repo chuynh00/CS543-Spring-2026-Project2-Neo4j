@@ -100,15 +100,18 @@ COMMAND_DETAILS = {
         "examples": ["stop"],
     },
     "run": {
-        "usage": "run --tier smoke|dev|full --mode rerank|parity|native-only|baseline-only [--order native-first|baseline-first]",
+        "usage": "run --tier smoke|dev|full --mode rerank|parity|native-only|baseline-only [--order native-first|baseline-first] [--parallelism N]",
         "details": [
             "Auto-runs setup checks before executing the benchmark.",
             "rerank and parity are comparison runs; native-only and baseline-only run one method.",
             "Comparison mode will restart Neo4j between phases to reduce cache bias.",
+            "--parallelism overrides native_config.parallelism: 1 = sequential BFS, N = up to N workers, 0 or less = all cores.",
         ],
         "examples": [
             "run --tier smoke --mode rerank",
             "run --tier smoke --mode parity",
+            "run --tier smoke --mode native-only --parallelism 1",
+            "run --tier smoke --mode native-only --parallelism 8",
             "run --tier dev --mode native-only",
         ],
     },
@@ -350,6 +353,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=("rerank", "parity", "native-only", "baseline-only"),
     )
     run_parser.add_argument("--order", choices=("native-first", "baseline-first"), help="Override the comparison order.")
+    run_parser.add_argument(
+        "--parallelism",
+        type=int,
+        default=None,
+        help=(
+            "Override native_config.parallelism for this run. "
+            "1 = sequential BFS, N = up to N worker threads, 0 or negative = use all cores."
+        ),
+    )
     run_parser.add_argument("--fresh", action="store_true", help="Rebuild dataset artifacts, runtime, and import.")
     run_parser.add_argument("--reimport", action="store_true", help="Replace only the imported ogbn-arxiv database.")
     run_parser.add_argument("--rebuild-runtime", action="store_true", help="Rebuild and re-extract the packaged runtime.")
@@ -1464,6 +1476,7 @@ def run_benchmark_command(
     tier: str,
     mode: str,
     order: str | None,
+    parallelism: int | None = None,
 ) -> None:
     mode_profile = settings.mode_profiles[mode]
     manifest_path = settings.tier_manifests[tier]
@@ -1481,6 +1494,7 @@ def run_benchmark_command(
         ("defaults", str(mode_profile.defaults_path)),
         ("results_root", str(settings.results_root)),
         ("order", resolved_order or "n/a"),
+        ("parallelism", "defaults" if parallelism is None else str(parallelism)),
     ):
         run_table.add_row(label, value)
     c = console()
@@ -1498,6 +1512,8 @@ def run_benchmark_command(
         "--output-root",
         str(settings.results_root),
     ]
+    if parallelism is not None:
+        command.extend(["--parallelism", str(parallelism)])
     if mode_profile.comparison:
         command.extend(
             [
@@ -1599,7 +1615,13 @@ def do_run(settings: BenchSettings, args: argparse.Namespace) -> int:
         rebuild_runtime=bool(args.rebuild_runtime),
         ensure_server_ready=True,
     )
-    run_benchmark_command(settings, tier=args.tier, mode=args.mode, order=args.order)
+    run_benchmark_command(
+        settings,
+        tier=args.tier,
+        mode=args.mode,
+        order=args.order,
+        parallelism=getattr(args, "parallelism", None),
+    )
     return 0
 
 

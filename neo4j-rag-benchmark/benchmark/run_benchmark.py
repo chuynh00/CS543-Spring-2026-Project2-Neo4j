@@ -402,6 +402,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Path to the Neo4j runtime home directory. Required for --run-comparison.",
     )
+    parser.add_argument(
+        "--parallelism",
+        type=int,
+        default=None,
+        help=(
+            "Override native_config.parallelism for this run. "
+            "1 = sequential BFS, N = up to N worker threads, 0 or negative = use all cores. "
+            "Leave unset to honor the value in the defaults JSON."
+        ),
+    )
 
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument(
@@ -489,6 +499,13 @@ def main() -> None:
     defaults = load_json(Path(args.defaults))
     manifest_path = resolve_manifest_path(args, neo4j_config)
     query_cases = load_query_cases(manifest_path, ROOT / "queries")
+
+    # CLI override: force a specific parallelism value into the native config.
+    if args.parallelism is not None:
+        native_config = dict(defaults.get("native_config", {}))
+        native_config["parallelism"] = args.parallelism
+        defaults["native_config"] = native_config
+        print(f"Parallelism override: native_config.parallelism = {args.parallelism}", flush=True)
 
     session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     results_root = Path(args.output_root)
